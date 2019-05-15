@@ -1,0 +1,212 @@
+
+<!doctype html>
+<html>
+<head>                  
+    <meta http-equiv=Content-Type content="text/html;charset=utf-8">
+    <meta http-equiv=X-UA-Compatible content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimum-scale=1.0, maximum-scale=1.0"/>
+    <title>加载显示geojson</title>
+    <link href="https://openlayers.org/en/v3.20.1/css/ol.css" rel="stylesheet" type="text/css" /> 
+    <script type="text/javascript" src="https://openlayers.org/en/v3.20.1/build/ol.js"></script>
+</head>
+<body>
+    <div id="info"></div>
+    <div>矢量地图Feature总数： <span id="count"></span></div>
+    <div id="map" style="width: 100%; height: 95%;"></div>
+<script type="text/javascript">
+
+    // 自定义分辨率和瓦片坐标系
+    var url = 'http://58.213.133.181:7791/tilemap/earth_image_geodetic/MapServer/tile/{z}/{y}/{x}';
+    var resolutions = [            
+        0.7031250000000001,
+        0.35156250000000006,
+        0.17578125000000003,
+        0.08789062500000001,
+        0.04394531250000001,
+        0.021972656250000003,
+		0.010986328125000002,
+		0.005493164062500001,
+		0.0027465820312500004,
+		0.0013732910156250002,
+	    0.0006866455078125001,
+		0.00034332275390625005,
+		0.00017166137695312503,
+		8.583068847656251e-05,
+		4.29153442382812e-05,
+		2.14576721191406e-05,
+		1.07288360595703e-05,
+		5.36441802978516e-06,
+		2.68220901489258e-06,
+		1.34110450744629e-06,
+		6.70552253723145e-07,
+        3.35276126861572e-07
+    ];
+
+    let projection = ol.proj.get('EPSG:4326');
+
+    var tilegrid  = new ol.tilegrid.TileGrid({
+        tileSize: [256,256],        // 瓦片图片分辨率
+        origin: [-180,90],          // 设置瓦片坐标原点坐标
+        extent: [-180,-90,180,90],  // 这个范围显示瓦片
+        resolutions: resolutions    // 设置分辨率
+    });
+
+    // 创建地科院地图的数据源
+    var nnuSource = new ol.source.TileImage({
+        projection: projection, 
+        tileGrid: tilegrid,
+        url: url,
+        wrapX: false
+    });
+
+    // 地科院地图层
+    var nnuMapLayer = new ol.layer.Tile({
+        visible: true,
+        source: nnuSource
+    });
+
+    var style = new ol.style.Style({
+        fill: new ol.style.Fill({
+            color: 'rgba(255, 255, 0, 0.6)'
+        }),
+        stroke: new ol.style.Stroke({
+            color: '#319FD3',
+            width: 3
+        }),
+        text: new ol.style.Text({
+            font: '楷体',
+            fill: new ol.style.Fill({
+                color: '#000'
+            }),
+            stroke: new ol.style.Stroke({
+                color: '#fff',
+                width: 2
+            })
+        })
+    });
+
+    // 创建地图
+    var map = new ol.Map({
+        /*layers: [
+            nnuMapLayer,
+            vectorLayer,
+        ],*/
+        view: new ol.View({ 
+            center: [106.642042,26.639891],
+            zoom: 7,
+            projection: 'EPSG:4326'
+        }),
+        target: 'map'
+    });
+
+    // 矢量图层
+	var vectorLayer = new ol.layer.Vector({
+        source: new ol.source.Vector({
+            url: '../data/geojson/guizhou.geojson',
+            format: new ol.format.GeoJSON(),
+            wrapX: false
+        }),
+        style: function(feature) {
+            style.getText().setText(feature.get('name'));
+            return style;
+        }
+    });
+	
+	// ol3监听方式
+	// 因为是异步加载，所以要采用事件监听的方式来判定是否加载完成 
+    var listenerKey = vectorLayer.getSource().on('change', function(){
+        if (vectorLayer.getSource().getState() === 'ready') {    // 判定是否加载完成
+            document.getElementById('count').innerHTML = vectorLayer.getSource().getFeatures().length;
+            vectorLayer.getSource().unByKey(listenerKey);        // 注销监听器
+        }
+    });
+	
+	// ol5监听方式
+	/*var listenerKey = vectorLayer.getSource().on('change', function(evt){
+        const source = evt.target;
+        if (source.getState() === 'ready') {
+            const numFeatures = source.getFeatures().length;
+			document.getElementById('count').innerHTML = numFeatures;
+        }
+    });*/
+
+    /*or*/
+
+    /*vectorLayer.getSource().on('change', function(evt){
+        const source = evt.target;
+        if (source.getState() === 'ready') {
+            const numFeatures = source.getFeatures().length;
+			document.getElementById('count').innerHTML = numFeatures;
+        }
+    })*/
+
+   
+    map.addLayer(nnuMapLayer);
+    map.addLayer(vectorLayer);
+	
+	var highlightStyle = new ol.style.Style({ //点击产出的颜色
+        stroke: new ol.style.Stroke({
+            color: '#B8860B',                 //点击边界颜色
+            width: 1
+        }),
+        fill: new ol.style.Fill({
+            color: 'rgba(255,0,0,0.1)'
+        }),
+        text: new ol.style.Text({
+            font: '12px Calibri,sans-serif',
+            fill: new ol.style.Fill({
+                color: 'red'
+            }),
+            stroke: new ol.style.Stroke({
+                color: '#B8860B',
+                width: 3
+            })
+        })
+    });
+	  
+    var featureOverlay = new ol.layer.Vector({
+        source: new ol.source.Vector(),
+        map: map,
+        style: function(feature) {
+            highlightStyle.getText().setText(feature.get('name'));
+            return highlightStyle;
+        }
+    });
+	  
+    var highlight;
+    var displayFeatureInfo = function(pixel) {
+        var feature = map.forEachFeatureAtPixel(pixel, function(feature) {
+            return feature;
+        });
+        var info = document.getElementById('info');
+        if (feature) {
+            info.innerHTML = feature.getId() + ': ' + feature.get('name');
+        } else {
+            info.innerHTML = '&nbsp;';
+        }
+        if (feature !== highlight) {
+            if (highlight) {
+                featureOverlay.getSource().removeFeature(highlight);
+            }
+            if (feature) {
+                featureOverlay.getSource().addFeature(feature);
+            }
+            highlight = feature;
+        }
+    };
+	  
+    map.on('click', function(evt) {
+        if (evt.dragging) {
+            return;
+        }
+        var pixel = map.getEventPixel(evt.originalEvent);
+        displayFeatureInfo(pixel);
+    });
+	  
+    map.on('pointermove', function(evt) {
+        displayFeatureInfo(evt.pixel);
+    });
+    
+</script>
+</body>
+</html>
