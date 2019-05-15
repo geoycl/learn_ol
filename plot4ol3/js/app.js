@@ -89,7 +89,7 @@
     // 矢量图层
 	var vectorLayer = new ol.layer.Vector({
         source: new ol.source.Vector({
-            url: 'https://geoycl.github.io/learn_ol/plot4ol3/data/geojson/guizhou.geojson',
+            url: 'https://geo.datav.aliyun.com/areas/bound/520000_full.json',
             format: new ol.format.GeoJSON(),
             wrapX: false
         }),
