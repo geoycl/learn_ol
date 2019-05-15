@@ -14,6 +14,7 @@
  * 如果想要收到API更新消息，请开源项目页面评论中留下联系方式 http://git.oschina.net/ilocation/plot
  *
  * */
+/*本demo是学习该系统的一个尝试*/
 
     var map, plotDraw, plotEdit, drawOverlay, drawStyle;
     // 自定义分辨率和瓦片坐标系
